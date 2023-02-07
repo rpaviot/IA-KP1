@@ -18,3 +18,10 @@ What is missing :
 -non linear bias term for wg+.
 - implementation of emcee.
 
+Requirements : 
+- treecorr : https://rmjarvis.github.io/TreeCorr/_build/html/index.html
+- pycorr : https://py2pcf.readthedocs.io/en/latest/
+- pyccl : https://ccl.readthedocs.io/en/latest/
+- fast-pt : https://github.com/JoeMcEwen/FAST-PT
+- iminuit : https://iminuit.readthedocs.io/en/stable/
+- emcee : https://emcee.readthedocs.io/en/stable/
