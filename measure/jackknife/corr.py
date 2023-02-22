@@ -263,93 +263,119 @@ class lensingPCF():
         return xirppi_t
     
     """Routines to compute wg+/gammat for multiple patch"""
-
-
-    def get_rppi_pairs(self,corrs):
-        xi_2d = np.zeros((self.npatch,len(self.bins2)-1,self.nbins-1))
-        w_2d = np.zeros((self.npatch,len(self.bins2)-1,self.nbins-1))
-
-        plist = [c._jackknife_pairs() for c in corrs]
-        plist = list(zip(*plist))
-        for row, pairs in enumerate(plist):
-            k = 0
-            for c, cpairs in zip(corrs, pairs):
-                cpairs = list(cpairs)
-                c._calculate_xi_from_pairs(cpairs)
-                xi_2d[row][k] = c.xi
-                w_2d[row][k] = c.weight
-                k = k+1
-
-        return xi_2d,w_2d
-    
-    def get_rppi_pairs_clustering(self,corrs):
-        xi_2d = np.zeros((self.npatch,len(self.bins2)-1,self.nbins-1))
-
-        plist = [c._jackknife_pairs() for c in corrs]
-        plist = list(zip(*plist))
-        for row, pairs in enumerate(plist):
-            k = 0
-            for c, cpairs in zip(corrs, pairs):
-                xi_2d[row][k] = c.weight
-                k = k+1
-        return xi_2d
-    
-    
     def get_rp_pairs(self,corrs):
-        pairs_1d = np.zeros((self.npatch,self.nbins-1))
-        w_1d = np.zeros((self.npatch,self.nbins-1))
-
-        plist = [c._jackknife_pairs() for c in corrs]
-        plist = list(zip(*plist))
-        for row, pairs in enumerate(plist):
-            for c, cpairs in zip(corrs, pairs):
-                cpairs = list(cpairs)
-                c._calculate_xi_from_pairs(cpairs)
-            pairs_1d[row] = c.xi
-            w_1d[row] = c.weight
-
-        return pairs_1d,w_1d
+        return corrs[0].weight
     
+    def get_xi(self,corrs):
+        return corrs[0].xi
     
-    def combine_jack_pairs_rppi(self,NG,RG,wNG,wRG,wRR):
-        for i in range(0,self.npatch):
-            NG[i] = NG[i]/self.ngnorm[i]
-            RG[i] = RG[i]/self.rgnorm[i]
-            wRR[i] = wRR[i]/self.rrnorm[i]
-
-        xirppi = (NG*wNG - RG*wRG)/wRR
-        wgp = np.sum(xirppi*self.dpi,axis=1)
-        wgp_mean = np.mean(wgp,axis=0)
-        wgp = wgp - wgp_mean
-        C = (1.-1./self.npatch)*np.dot(wgp.T,wgp)
-        return wgp,wgp_mean,C
-    
-    
-    def combine_jack_pairs_rppi_clustering(self,NG,RG,RR):
+    def get_jackknife_rp_pairs_clustering(self,corrNG,corrRG,corrRR):
+        out_DD=treecorr.build_multi_cov_design_matrix([corrNG], 'jackknife', func=self.get_rp_pairs)
+        out_DR=treecorr.build_multi_cov_design_matrix([corrRG], 'jackknife', func=self.get_rp_pairs)
+        out_RR=treecorr.build_multi_cov_design_matrix([corrRR], 'jackknife', func=self.get_rp_pairs)
         
-        for i in range(0,self.npatch):
-            NG[i] = NG[i]/self.ngnorm[i]
-            RG[i] = RG[i]/self.rgnorm[i]
-            RR[i] = RR[i]/self.rrnorm[i]
+        pairs_DD,weight1_ = zip(*out_DD)
+        pairs_DR,weight2_ = zip(*out_DR)
+        pairs_RR,weight3_ = zip(*out_RR)
 
-        xirppi = NG/RR - 2*RG/RR + 1.
-        wgg = np.sum(xirppi*self.dpi,axis=1)
-        wgg_mean = np.mean(wgg,axis=0)
-        wgg = wgg - wgg_mean
-        C = (1.-1./self.npatch)*np.dot(wgg.T,wgg)
-        return wgg,wgg_mean,C
+        pairs_DD = np.array(pairs_DD)
+        pairs_DR = np.array(pairs_DR)
+        pairs_RR = np.array(pairs_RR)
+
+        pairs_DD_norm = pairs_DD/self.ngnorm[:,np.newaxis]
+        pairs_DR_norm = pairs_DR/self.rgnorm[:,np.newaxis]
+        pairs_RR_norm = pairs_RR/self.rrnorm[:,np.newaxis] 
+        
+        return pairs_DD_norm,pairs_DR_norm,pairs_RR_norm
     
-    def combine_jack_pairs(self,NG,RG,wNG,wRG):
-        for i in range(0,self.npatch):
-            NG[i] = NG[i]/self.ngnorm[i]
-            RG[i] = RG[i]/self.rgnorm[i]
-            wRG[i] = wRG[i]/self.rgnorm[i]
+    def get_jackknife_rp_pairs(self,corrNG,corrRG,corrRR):
+        
+        out_xiDD = treecorr.build_multi_cov_design_matrix([corrNG], 'jackknife', func=self.get_xi)
+        out_xiDR = treecorr.build_multi_cov_design_matrix([corrRG], 'jackknife', func=self.get_xi)
 
-        xi = (NG*wNG - RG*wRG)/wRG
+        xi_DD,_ = zip(*out_xiDD)
+        xi_DR,_ = zip(*out_xiDR)
+
+        xi_DD = np.array(xi_DD)
+        xi_DR = np.array(xi_DR)
+
+        DD,DR,RR = self.get_jackknife_rp_pairs_clustering(corrNG,corrRG,corrRR)
+        
+        return xi_DD,xi_DR,DD,DR,RR
+
+    
+    def get_jackknife_rppi_pairs_clustering(self,dictNG,dictRG,dictRR):
+        
+        out_DD=[treecorr.build_multi_cov_design_matrix([x], 'jackknife', func=self.get_rp_pairs) for x in dictNG.values()]
+        out_DR=[treecorr.build_multi_cov_design_matrix([x], 'jackknife', func=self.get_rp_pairs) for x in dictRG.values()]
+        out_RR=[treecorr.build_multi_cov_design_matrix([x], 'jackknife', func=self.get_rp_pairs) for x in dictRR.values()]
+        
+        pairs_DD,weight1_ = zip(*out_DD)
+        pairs_DR,weight2_ = zip(*out_DR)
+        pairs_RR,weight3_ = zip(*out_RR)
+
+        pairs_DD = np.array(pairs_DD)
+        pairs_DR = np.array(pairs_DR)
+        pairs_RR = np.array(pairs_RR)
+
+        pairs_DD_norm = np.array([x/self.ngnorm[:,np.newaxis] for x in pairs_DD])
+        pairs_DR_norm = np.array([x/self.rgnorm[:,np.newaxis] for x in pairs_DR])
+        pairs_RR_norm = np.array([x/self.rrnorm[:,np.newaxis] for x in pairs_RR])
+        
+        return pairs_DD_norm,pairs_DR_norm,pairs_RR_norm
+    
+
+    def get_jackknife_rppi_pairs(self,dictNG,dictRG,dictRR):
+        
+        out_xiDD = [treecorr.build_multi_cov_design_matrix([x], 'jackknife', func=self.get_xi) for x in dictNG.values()]
+        out_xiDR = [treecorr.build_multi_cov_design_matrix([x], 'jackknife', func=self.get_xi) for x in dictRG.values()]
+
+        xi_DD,_ = zip(*out_xiDD)
+        xi_DR,_ = zip(*out_xiDR)
+
+        xi_DD = np.array(xi_DD)
+        xi_DR = np.array(xi_DR)
+
+        DD,DR,RR = self.get_jackknife_rppi_pairs_clustering(dictNG,dictRG,dictRR)
+        
+        return xi_DD,xi_DR,DD,DR,RR
+    
+
+    def combine_jack_pairs_rp(self,corrNG,corrRG,corrRR):
+
+        NG,RG,wNG,wRG,wRR = self.get_jackknife_rp_pairs(corrNG,corrRG,corrRR)
+
+        xi = (NG*wNG - RG*wRG)/wRR
         xi_mean = np.mean(xi,axis=0)
         xi = xi - xi_mean
         C = (1.-1./self.npatch)*np.dot(xi.T,xi)
         return xi_mean,C
+    
+
+    
+    def combine_jack_pairs_rppi(self,dictNG,dictRG,dictRR):
+
+        NG,RG,wNG,wRG,wRR = self.get_jackknife_rppi_pairs(dictNG,dictRG,dictRR)
+        
+        xirppi = (NG*wNG - RG*wRG)/wRR
+        wgp = np.sum(xirppi*self.dpi,axis=0)
+        wgp_mean = np.mean(wgp,axis=0)
+        wgp = wgp - wgp_mean
+        C = (1.-1./self.npatch)*np.dot(wgp.T,wgp)
+        
+        return wgp_mean,C
+
+    
+    def combine_jack_pairs_rppi_clustering(self,dictNG,dictRG,dictRR):
+  
+        NG,RG,RR = self.get_jackknife_rppi_pairs_clustering(dictNG,dictRG,dictRR)
+    
+        xirppi = NG/RR - 2*RG/RR + 1.
+        wgg = np.sum(xirppi*self.dpi,axis=0)
+        wgg_mean = np.mean(wgg,axis=0)
+        wgg = wgg - wgg_mean
+        C = (1.-1./self.npatch)*np.dot(wgg.T,wgg)
+        return wgg_mean,C
 
     
     def compute_gammat(self,min_rpar=0):
@@ -362,18 +388,20 @@ class lensingPCF():
 
         rg = treecorr.NGCorrelation(bin_type='Log',nbins=self.nbins-1,min_sep=self.min_sep,
                                       max_sep=self.max_sep,min_rpar=min_rpar,metric="Rlens",bin_slop=self.bin_slop,var_method=self.var_method)
+        
+        rr = treecorr.NNCorrelation(bin_type='Log',nbins=self.nbins-1,min_sep=self.min_sep,
+                                      max_sep=self.max_sep,min_rpar=min_rpar,metric="Rlens",bin_slop=self.bin_slop,var_method=self.var_method)
 
         ng.process(self.data1,self.data2)
         rg.process(self.rand1,self.data2)
+        rr.process(self.rand1,self.rand2)
 
-        corrs=[ng,rg]
+        corrs=[ng,rg,rr]
         if self.var_method =="shot":
-            xi = self.combine_pairs_DS(corrs)
+            xi = self.combine_pairs_RS(corrs)
             err = np.sqrt(self.varg/rg.weight*(self.rgnorm/self.ngnorm)) 
         else:
-            NG,wNG = self.get_rp_pairs([ng])
-            RG,wRG = self.get_rp_pairs([rg])
-            xi,cov = self.combine_jack_pairs(NG,RG,wNG,wRG)
+            xi,cov = self.combine_jack_pairs_rp(ng,rg,rr)
             self.xi = xi
             self.cov = cov
             err = np.sqrt(np.diag(cov))
@@ -426,12 +454,8 @@ class lensingPCF():
             #Wrong
             err = np.sqrt(self.varg/rg.weight*(self.rgnorm/self.ngnorm))    
         else:
-            NG,wNG = self.get_rppi_pairs(catNG)
-            RG,wRG = self.get_rppi_pairs(catRG)
-            RR = self.get_rppi_pairs_clustering(catRR)
-                
-            xi,xi_mean,cov = self.combine_jack_pairs_rppi(NG,RG,wNG,wRG,RR)
-            self.xi = xi            
+            xi_mean,cov = self.combine_jack_pairs_rppi(dictNG,dictRG,dictRR)
+            self.xi = xi_mean            
             self.cov = cov
             err = np.sqrt(np.diag(cov))
 
@@ -446,7 +470,6 @@ class lensingPCF():
         dictRN = {}
         dictRR = {}
         self.dpi = abs(self.bins2[1] - self.bins2[0])        
-        t1 = time.time()
         
         for i in range(0,len(self.bins2)-1):
             pi_min = self.bins2[i]
@@ -476,11 +499,8 @@ class lensingPCF():
             xi_mean = self.combine_pairs_RS_proj_clustering(corrs)        
             err = np.sqrt(self.varg/rg.weight*(self.rgnorm/self.ngnorm))    
         else:
-            NN = self.get_rppi_pairs_clustering(catNN)
-            RN = self.get_rppi_pairs_clustering(catRN)
-            RR = self.get_rppi_pairs_clustering(catRR)
-            xi,xi_mean,cov = self.combine_jack_pairs_rppi_clustering(NN,RN,RR)
-            self.xi = xi            
+            xi_mean,cov = self.combine_jack_pairs_rppi_clustering(dictNN,dictRN,dictRR)
+            self.xi = xi_mean            
             self.cov = cov
             err = np.sqrt(np.diag(cov))
 
@@ -509,3 +529,8 @@ class lensingPCF():
         xi = self.xi_tot - self.xi_mean
         Cov = (1.-1./self.npatch)*np.dot(xi.T,xi)
         return Cov
+
+    
+    def get_cov(self):
+        return self.cov
+    
