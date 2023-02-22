@@ -37,9 +37,11 @@ class deleted_jackknife(jackknife):
         self.array_comb = np.array(list_comb)
 
         """Get all one by one combinations between unique patches"""
-        comb = [",".join(map(str, comb)) for comb in combinations(self.upatches, 2)]        
-        jackpairs = list(map(eval,comb))
-        self.jackpairs = np.array(jackpairs)
+        patcht = self.upatches
+        for i in range(0,len(self.upatches)):
+            self.jackpairs.append([(i,ii) for ii in patcht if ii != i])           
+
+        self.jackpairs = np.vstack(self.jackpairs)
 
     def read_input(self,**qwargs):
 
