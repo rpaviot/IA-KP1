@@ -2,7 +2,7 @@ import numpy as np
 from scipy import stats
 import treecorr
 from astropy.cosmology import FlatLambdaCDM
-from scipy.special import binom, comb
+from scipy.special import binom
 from itertools import combinations
 from jackknife import jackknife
 
@@ -27,29 +27,19 @@ class deleted_jackknife(jackknife):
 
     def get_combinations(self):
         
-        """get a list of all d-deleted jackknife combinations"""
-
+        """Total number of realisations"""
         self.comb = int(binom(self.Ns,self.Nd))
-        comb = [",".join(map(str, comb)) for comb in combinations(self.upatches, self.Nd)]        
+        
+        """get a list of all d-deleted jackknife combinations"""
+        
+        comb = [",".join(map(str, comb)) for comb in combinations(self.upatches, self.Ns - self.Nd)]        
         list_comb = list(map(eval,comb))
         self.array_comb = np.array(list_comb)
 
-        
-        """get the total numbers of jackknife pairs"""
-
-        self.npairs = int((self.Ns*(self.Ns-1))/2)        
-
         """Get all one by one combinations between unique patches"""
-
-        for i in range(0,len(self.upatches)):
-            centers = self.data1_._centers
-            dist_cent = np.array([self.dist(centers[i],centers[j]) for j in range(0,len(centers))])
-            dist_cent = dist_cent/np.min(dist_cent[dist_cent !=0])
-            cond = ((dist_cent > 0.99) & (dist_cent < 3.0))
-            link = self.upatches[cond]
-            self.jackpairs.append([(i,link[j]) for j in range(0,len(link))])           
-            
-        self.jackpairs = np.vstack(self.jackpairs)
+        comb = [",".join(map(str, comb)) for comb in combinations(self.upatches, 2)]        
+        jackpairs = list(map(eval,comb))
+        self.jackpairs = np.array(jackpairs)
 
     def read_input(self,**qwargs):
 
