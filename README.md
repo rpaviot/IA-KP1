@@ -14,8 +14,8 @@ The theory folder needs to be update with notebook examples, so far it takes in 
 - minimization with iminuit.
 
 What is missing :
--RSD for wg+
--non linear bias term for wg+.
+- RSD for wg+
+- non linear bias term for wg+.
 - implementation of emcee.
 
 Requirements : 
